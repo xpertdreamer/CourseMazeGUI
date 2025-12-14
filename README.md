@@ -108,38 +108,6 @@ maze.exe race_state   # Show current position
    - Automatically saved to `race_results.txt`
    - Contains detailed statistics
 
-### Output Format
-
-When player finishes:
-```
-╔════════════════════════════════════════════════╗
-║         🏁 RACE RESULTS COMPARISON 🏁          ║
-╠════════════════════════════════════════════════╣
-║  MOVES:                                        ║
-║    👤 Player:   42 moves                       ║
-║    🤖 A*:       35 moves (optimal)             ║
-║    📊 Your efficiency: 83.3%                   ║
-║    👍 GOOD! Decent performance!                ║
-╠════════════════════════════════════════════════╣
-║  TIME:                                         ║
-║    👤 Player:   45.230 sec                     ║
-║    🤖 A*:       0.003214 sec                   ║
-║    ⚡ A* was 14073x faster!                    ║
-╠════════════════════════════════════════════════╣
-║  You made 7 extra moves                        ║
-╚════════════════════════════════════════════════╝
-```
-
-### Performance Ratings
-
-- **100% efficiency** = ⭐ PERFECT! Optimal path found!
-- **90-99%** = 🌟 EXCELLENT! Very close to optimal!
-- **75-89%** = 👍 GOOD! Decent performance!
-- **50-74%** = 📈 Not bad, but room for improvement!
-- **<50%** = 💪 Keep practicing!
-
----
-
 ## File Structure
 
 ```
