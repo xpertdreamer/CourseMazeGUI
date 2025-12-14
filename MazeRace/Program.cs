@@ -429,8 +429,7 @@ namespace MazeRace
 
             // Check current maze state
             var statusResult = RunCommand("current");
-            if (statusResult.Contains("No maze loaded") || 
-                (statusResult.Contains("5x5") && !statusResult.Contains("loaded")))
+            if (statusResult.Contains("No maze loaded"))
             {
                 ShowError("No valid maze loaded! Generate or load a maze first.");
                 return;
@@ -486,8 +485,7 @@ namespace MazeRace
 
             // Check current maze state
             var statusResult = RunCommand("current");
-            if (statusResult.Contains("No maze loaded") || 
-                (statusResult.Contains("5x5") && !statusResult.Contains("loaded")))
+            if (statusResult.Contains("No maze loaded"))
             {
                 ShowError("No maze loaded! Generate or load a maze first.");
                 return;
@@ -526,8 +524,7 @@ namespace MazeRace
         {
             // Check if maze is properly loaded
             var statusResult = RunCommand("current");
-            if (statusResult.Contains("No maze loaded") || 
-                (statusResult.Contains("5x5") && !statusResult.Contains("loaded")))
+            if (statusResult.Contains("No maze loaded"))
             {
                 ShowError("No valid maze loaded! Generate or load a maze first.");
                 Thread.Sleep(2000);
@@ -662,10 +659,11 @@ namespace MazeRace
                         PressAnyKey();
                         needsRedraw = true;
                     }
-
+                    
                     // Show results if race finished
                     if (raceFinished)
                     {
+                        PressAnyKey();
                         ViewRaceResults();
                         showControl = true;
                         lastMazeState = "";
