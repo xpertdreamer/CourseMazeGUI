@@ -526,4 +526,4 @@ namespace MazeTUI
             }
         }
     }
-}
+}   
