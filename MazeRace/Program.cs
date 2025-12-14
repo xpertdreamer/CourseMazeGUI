@@ -3,7 +3,7 @@ using Spectre.Console;
 
 namespace MazeRace
 {
-    class Program
+    internal static class Program
     {
         private const string MazeExe = "maze.exe";
         private const string TempFile = "maze_temp.txt";
@@ -14,9 +14,8 @@ namespace MazeRace
         
         private static int _lastConsoleWidth;
         private static int _lastConsoleHeight;
-        private static bool _consoleResized = false;
 
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
             Console.OutputEncoding = System.Text.Encoding.UTF8;
             Console.CursorVisible = false;
@@ -85,7 +84,7 @@ namespace MazeRace
             }
         }
 
-        static void CleanupTempFiles()
+        private static void CleanupTempFiles()
         {
             try
             {
@@ -108,7 +107,7 @@ namespace MazeRace
             }
         }
 
-        static bool CheckConsoleResize()
+        private static bool CheckConsoleResize()
         {
             try
             {
@@ -130,7 +129,7 @@ namespace MazeRace
             return false;
         }
 
-        static void ShowAppTitle()
+        private static void ShowAppTitle()
         {
             var title = new FigletText("BUDNIKOW A.S. COURSE WORK")
                 .Centered()
@@ -138,7 +137,7 @@ namespace MazeRace
             AnsiConsole.Write(title);
         }
 
-        static void ShowGoodbye()
+        private static void ShowGoodbye()
         {
             SmoothClear();
             ShowAppTitle();
@@ -161,7 +160,7 @@ namespace MazeRace
             PressAnyKey();
         }
 
-        static string ShowMainMenu()
+        private static string ShowMainMenu()
         {
             SmoothClear();
             ShowAppTitle();
@@ -208,7 +207,7 @@ namespace MazeRace
             return AnsiConsole.Prompt(menu);
         }
 
-        static void GenerateMaze()
+        private static void GenerateMaze()
         {
             SmoothClear();
             ShowAppTitle();
@@ -293,7 +292,7 @@ namespace MazeRace
             }
         }
 
-        static void LoadMaze()
+        private static void LoadMaze()
         {
             SmoothClear();
             ShowAppTitle();
@@ -351,7 +350,7 @@ namespace MazeRace
             }
         }
 
-        static void SaveMaze()
+        private static void SaveMaze()
         {
             SmoothClear();
             ShowAppTitle();
@@ -414,7 +413,7 @@ namespace MazeRace
             AnsiConsole.Write(Align.Center(resultPanel));
         }
 
-        static void FindPath()
+        private static void FindPath()
         {
             SmoothClear();
             ShowAppTitle();
@@ -470,7 +469,7 @@ namespace MazeRace
             }
         }
 
-        static void PrintMaze()
+        private static void PrintMaze()
         {
             SmoothClear();
             ShowAppTitle();
@@ -499,7 +498,7 @@ namespace MazeRace
             AnsiConsole.Write(Align.Center(mazePanel));
         }
 
-        static void ShowStatus()
+        private static void ShowStatus()
         {
             SmoothClear();
             ShowAppTitle();
@@ -520,7 +519,7 @@ namespace MazeRace
             AnsiConsole.Write(Align.Center(statusPanel));
         }
 
-        static void RaceMode()
+        private static void RaceMode()
         {
             // Check if maze is properly loaded
             var statusResult = RunCommand("current");
@@ -684,7 +683,7 @@ namespace MazeRace
             }
         }
 
-        static void ShowRaceMenu(bool showControl, bool hasRace, ref string lastMazeState)
+        private static void ShowRaceMenu(bool showControl, bool hasRace, ref string lastMazeState)
         {
             string currentMazeState = "";
             
@@ -746,7 +745,7 @@ namespace MazeRace
                     Align.Center(
                         new Markup(
                             "[cyan1 bold]🕹️ MOVEMENT[/]\n\n" +
-                            "[dim]↑[/] ⬆️ Move Up    [dim]↓[/] ⬇️ Move Down    [dim]←[/] ⬅️ Move Left    [dim]→[/] ➡️ Move Right"
+                            "[dim]↑[/] Move Up    [dim]↓[/] Move Down    [dim]←[/] Move Left    [dim]→[/] Move Right"
                         )
                     )
                 )
@@ -793,7 +792,7 @@ namespace MazeRace
             }
         }
 
-        static void ViewRaceResults()
+        private static void ViewRaceResults()
         {
             SmoothTransition(() =>
             {
@@ -833,7 +832,7 @@ namespace MazeRace
             PressAnyKey();
         }
 
-        static void ShowError(string message)
+        private static void ShowError(string message)
         {
             var errorPanel = new Panel(Align.Center(new Markup($"[red bold]⚠️ {message}[/]")))
                 .Border(BoxBorder.Heavy)
@@ -844,14 +843,14 @@ namespace MazeRace
             AnsiConsole.Write(Align.Center(errorPanel));
         }
 
-        static void PressAnyKey()
+        private static void PressAnyKey()
         {
             AnsiConsole.WriteLine();
             AnsiConsole.Write(Align.Center(new Markup("[dim]Press [cyan1 bold]any key[/] to continue...[/]")));
             Console.ReadKey(true);
         }
 
-        static void EnsureMinimumDuration(Stopwatch stopwatch)
+        private static void EnsureMinimumDuration(Stopwatch stopwatch)
         {
             var elapsed = stopwatch.ElapsedMilliseconds;
             if (elapsed < SpinnerMinDuration)
@@ -860,23 +859,23 @@ namespace MazeRace
             }
         }
 
-        static void SmoothClear()
+        private static void SmoothClear()
         {
             AnsiConsole.Clear();
         }
 
-        static void SmoothTransition(Action renderAction)
+        private static void SmoothTransition(Action renderAction)
         {
-            Thread.Sleep(30);
+            Thread.Sleep(300);
             
             // Render new content
             renderAction();
             
             // Small delay for smooth perception
-            Thread.Sleep(30);
+            Thread.Sleep(300);
         }
 
-        static string RunCommand(string arguments)
+        private static string RunCommand(string arguments)
         {
             try
             {
