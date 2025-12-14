@@ -1,10 +1,7 @@
-﻿using System;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.IO;
+﻿using System.Diagnostics;
 using Spectre.Console;
 
-namespace MazeTUI
+namespace MazeRace
 {
     class Program
     {
@@ -12,194 +9,305 @@ namespace MazeTUI
         private const string TempFile = "maze_temp.txt";
         private const string RaceActiveFile = "race_active.tmp";
         private const string RaceResultsFile = "race_results.txt";
+        private const string RaceStateFile = "race_state.tmp";
+        private const int SpinnerMinDuration = 1000; // milliseconds
+        
+        private static int _lastConsoleWidth;
+        private static int _lastConsoleHeight;
+        private static bool _consoleResized = false;
 
         static void Main(string[] args)
         {
             Console.OutputEncoding = System.Text.Encoding.UTF8;
+            Console.CursorVisible = false;
+            
+            _lastConsoleWidth = Console.WindowWidth;
+            _lastConsoleHeight = Console.WindowHeight;
             
             if (!File.Exists(MazeExe))
             {
                 ShowError("maze.exe not found in current directory!");
+                Console.CursorVisible = true;
                 return;
             }
-            
-            ShowWelcomeBanner();
 
-            while (true)
+            try
             {
-                var choice = ShowMainMenu();
-                
-                if (choice == "Exit")
+                while (true)
                 {
-                    ShowGoodbye();
-                    break;
-                }
-
-                try
-                {
-                    switch (choice)
+                    var choice = ShowMainMenu();
+                    
+                    if (choice == "🚪 Exit")
                     {
-                        case "🎲 Generate New Maze":
-                            GenerateMaze();
-                            break;
-                        case "📂 Load Maze from File":
-                            LoadMaze();
-                            break;
-                        case "💾 Save Current Maze":
-                            SaveMaze();
-                            break;
-                        case "🔍 Find Path (A*)":
-                            FindPath();
-                            break;
-                        case "🖨️  Print Current Maze":
-                            PrintMaze();
-                            break;
-                        case "📊 Show Maze Statistics":
-                            ShowStatus();
-                            break;
-                        case "🏁 Race Mode":
-                            RaceMode();
-                            break;
+                        ShowGoodbye();
+                        break;
                     }
-                }
-                catch (Exception ex)
-                {
-                    ShowError(ex.Message);
-                }
 
-                PressAnyKey();
+                    try
+                    {
+                        switch (choice)
+                        {
+                            case "🎲 Generate New Maze":
+                                GenerateMaze();
+                                break;
+                            case "📂 Load Maze from File":
+                                LoadMaze();
+                                break;
+                            case "💾 Save Current Maze":
+                                SaveMaze();
+                                break;
+                            case "🔍 Find Path (A*)":
+                                FindPath();
+                                break;
+                            case "🖨️ Print Current Maze":
+                                PrintMaze();
+                                break;
+                            case "📊 Show Maze Statistics":
+                                ShowStatus();
+                                break;
+                            case "🏁 Race Mode":
+                                RaceMode();
+                                break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        ShowError(ex.Message);
+                    }
+
+                    PressAnyKey();
+                }
+            }
+            finally
+            {
+                CleanupTempFiles();
+                Console.CursorVisible = true;
             }
         }
 
-        static void ShowWelcomeBanner()
+        static void CleanupTempFiles()
         {
-            AnsiConsole.Clear();
+            try
+            {
+                if (File.Exists(TempFile))
+                {
+                    File.Delete(TempFile);
+                }
+                if (File.Exists(RaceActiveFile))
+                {
+                    File.Delete(RaceActiveFile);
+                }
+                if (File.Exists(RaceStateFile))
+                {
+                    File.Delete(RaceStateFile);
+                }
+            }
+            catch
+            {
+                // Ignore cleanup errors
+            }
+        }
+
+        static bool CheckConsoleResize()
+        {
+            try
+            {
+                int currentWidth = Console.WindowWidth;
+                int currentHeight = Console.WindowHeight;
+                
+                if (currentWidth != _lastConsoleWidth || currentHeight != _lastConsoleHeight)
+                {
+                    _lastConsoleWidth = currentWidth;
+                    _lastConsoleHeight = currentHeight;
+                    return true;
+                }
+            }
+            catch
+            {
+                // Ignore errors when checking console size
+            }
             
-            var gradient = new FigletText("MAZE SOLVER")
+            return false;
+        }
+
+        static void ShowAppTitle()
+        {
+            var title = new FigletText("BUDNIKOW A.S. COURSE WORK")
                 .Centered()
-                .Color(Color.Blue);
-            
-            AnsiConsole.Write(gradient);
-            
-            var subtitle = new Markup("[dim]Interactive Pathfinding & Maze Generation Tool[/]");
-            AnsiConsole.Write(new Panel(subtitle)
-                .BorderColor(Color.Grey)
-                .Padding(1, 0));
-            
-            AnsiConsole.WriteLine();
+                .Color(Color.Cyan1);
+            AnsiConsole.Write(title);
         }
 
         static void ShowGoodbye()
         {
-            AnsiConsole.Clear();
-            var goodbye = new FigletText("Goodbye!")
-                .Centered()
-                .Color(Color.Green);
-            AnsiConsole.Write(goodbye);
+            SmoothClear();
+            ShowAppTitle();
             AnsiConsole.WriteLine();
+            
+            var panel = new Panel(
+                Align.Center(
+                    new Markup("[cyan1 bold]Thank you for using![/]\n[dim]See you next time! 👋[/]"),
+                    VerticalAlignment.Middle
+                )
+            )
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Cyan1)
+                .Header("[cyan1 bold]GOODBYE[/]")
+                .HeaderAlignment(Justify.Center)
+                .Padding(2, 1);
+            
+            AnsiConsole.Write(Align.Center(panel));
+            AnsiConsole.WriteLine();
+            PressAnyKey();
         }
 
         static string ShowMainMenu()
         {
-            AnsiConsole.Clear();
-            
-            // Красивый заголовок
-            var rule = new Rule("[cyan bold]MAIN MENU[/]")
-            {
-                Justification = Justify.Center,
-                Style = Style.Parse("cyan")
-            };
-            AnsiConsole.Write(rule);
+            SmoothClear();
+            ShowAppTitle();
             AnsiConsole.WriteLine();
 
-            // Статус панель с иконками
-            var hasMaze = File.Exists(TempFile);
+            var hasMaze = File.Exists(TempFile) && new FileInfo(TempFile).Length > 0;
             var hasRace = File.Exists(RaceActiveFile);
 
-            var statusTable = new Table()
-                .Border(TableBorder.Rounded)
+            // Status panel
+            var statusText = $"🗺️  Maze: {(hasMaze ? "[green bold]LOADED[/]" : "[red bold]NOT LOADED[/]")}    🏃 Race: {(hasRace ? "[green bold]ACTIVE[/]" : "[grey bold]INACTIVE[/]")}";
+            var statusPanel = new Panel(Align.Center(new Markup(statusText)))
+                .Border(BoxBorder.Rounded)
                 .BorderColor(Color.Grey)
-                .AddColumn(new TableColumn("[bold]Status[/]").Centered())
-                .AddColumn(new TableColumn("[bold]Value[/]").Centered());
-
-            statusTable.AddRow(
-                "🗺️  Maze Loaded", 
-                hasMaze ? "[green]✓ Yes[/]" : "[red]✗ No[/]"
-            );
-            statusTable.AddRow(
-                "🏃 Active Race", 
-                hasRace ? "[green]✓ Yes[/]" : "[grey]✗ No[/]"
-            );
-
-            AnsiConsole.Write(statusTable);
+                .Padding(1, 0);
+            
+            AnsiConsole.Write(Align.Center(statusPanel));
             AnsiConsole.WriteLine();
 
-            // Меню с группировкой
             var menu = new SelectionPrompt<string>()
-                .Title("[yellow bold]What would you like to do?[/]")
-                .PageSize(12)
-                .HighlightStyle(new Style(Color.Cyan1, decoration: Decoration.Bold))
-                .AddChoiceGroup("[blue bold]Maze Operations[/]", new[] {
+                .Title(Align.Center(new Markup("[yellow bold]What would you like to do?[/]")).ToString())
+                .PageSize(20)
+                .HighlightStyle(new Style(Color.Black, Color.Yellow, Decoration.Bold))
+                .AddChoiceGroup("Maze Operations", new[]
+                {
                     "🎲 Generate New Maze",
                     "📂 Load Maze from File",
                     "💾 Save Current Maze"
                 })
-                .AddChoiceGroup("[green bold]Pathfinding[/]", new[] {
+                .AddChoiceGroup("Pathfinding", new[]
+                {
                     "🔍 Find Path (A*)",
-                    "🖨️  Print Current Maze",
+                    "🖨️ Print Current Maze",
                     "📊 Show Maze Statistics"
                 })
-                .AddChoiceGroup("[yellow bold]Interactive[/]", new[] {
+                .AddChoiceGroup("Interactive", new[]
+                {
                     "🏁 Race Mode"
                 })
-                .AddChoiceGroup("[red bold]System[/]", new[] {
-                    "Exit"
+                .AddChoiceGroup("System", new[]
+                {
+                    "🚪 Exit"
                 });
-
+                
             return AnsiConsole.Prompt(menu);
         }
 
         static void GenerateMaze()
         {
-            AnsiConsole.Clear();
-            ShowSectionHeader("Generate New Maze", "🎲");
+            SmoothClear();
+            ShowAppTitle();
+            AnsiConsole.WriteLine();
 
-            var rows = AnsiConsole.Prompt(
-                new TextPrompt<int>("Enter number of [cyan]rows[/] (1-60):")
-                    .DefaultValue(20)
-                    .ValidationErrorMessage("[red]Please enter a number between 1 and 60[/]")
-                    .Validate(r => r >= 1 && r <= 60)
+            var headerPanel = new Panel(Align.Center(new Markup("[cyan1 bold]🎲 GENERATE NEW MAZE[/]")))
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Cyan1)
+                .Padding(1, 0);
+            AnsiConsole.Write(Align.Center(headerPanel));
+            AnsiConsole.WriteLine();
+
+            var dimensions = AnsiConsole.Prompt(
+                new TextPrompt<string>("[cyan1]Enter maze size[/] [dim](rows cols, e.g., 20 20)[/]:")
+                    .DefaultValue("20 20")
+                    .ValidationErrorMessage("[red]Min 5x5, max 60x60[/]")
+                    .Validate(input =>
+                    {
+                        var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length != 2) return ValidationResult.Error("[red]Enter two numbers[/]");
+                        
+                        if (!int.TryParse(parts[0], out int rows) || !int.TryParse(parts[1], out int cols))
+                            return ValidationResult.Error("[red]Invalid numbers[/]");
+                        
+                        if (rows < 5 || cols < 5)
+                            return ValidationResult.Error("[red]Min 5x5[/]");
+                        
+                        if (rows > 60 || cols > 60)
+                            return ValidationResult.Error("[red]Max 60x60[/]");
+                        
+                        return ValidationResult.Success();
+                    })
             );
 
-            var cols = AnsiConsole.Prompt(
-                new TextPrompt<int>("Enter number of [cyan]columns[/] (1-60):")
-                    .DefaultValue(20)
-                    .ValidationErrorMessage("[red]Please enter a number between 1 and 60[/]")
-                    .Validate(c => c >= 1 && c <= 60)
-            );
+            var parts = dimensions.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            int rows = int.Parse(parts[0]);
+            int cols = int.Parse(parts[1]);
 
             AnsiConsole.WriteLine();
 
             string result = "";
             AnsiConsole.Status()
-                .Spinner(Spinner.Known.Dots2)
-                .SpinnerStyle(Style.Parse("cyan bold"))
-                .Start($"[cyan]Generating {rows}×{cols} maze...[/]", ctx =>
+                .Spinner(Spinner.Known.Dots12)
+                .SpinnerStyle(Style.Parse("cyan1 bold"))
+                .Start($"[cyan1]⚡ Generating {rows}×{cols} maze...[/]", ctx =>
                 {
+                    var stopwatch = Stopwatch.StartNew();
                     result = RunCommand($"gen {rows} {cols}");
+                    EnsureMinimumDuration(stopwatch);
                 });
 
+            // Verify maze was generated correctly
             AnsiConsole.WriteLine();
-            ShowSuccessPanel(result);
+            AnsiConsole.Write(Align.Center(new Markup("[cyan1]🔍 Verifying maze has valid path...[/]")));
+            
+            var pathResult = RunCommand("find");
+            bool hasValidPath = !pathResult.Contains("ERROR: No path found") && 
+                               !pathResult.Contains("No path found!");
+            
+            AnsiConsole.WriteLine();
+            
+            if (hasValidPath)
+            {
+                var resultPanel = new Panel(Align.Center(new Markup($"[green]{result}[/]\n[dim]✓ Maze has valid path[/]")))
+                    .Border(BoxBorder.Rounded)
+                    .BorderColor(Color.Green)
+                    .Header("[green bold]✓ SUCCESS[/]")
+                    .HeaderAlignment(Justify.Center)
+                    .Padding(1, 0);
+                AnsiConsole.Write(Align.Center(resultPanel));
+            }
+            else
+            {
+                var resultPanel = new Panel(Align.Center(
+                    new Markup($"[yellow]{result}[/]\n[red]⚠️ Generated maze has no valid path![/]\n[dim]Try generating again...[/]")))
+                    .Border(BoxBorder.Rounded)
+                    .BorderColor(Color.Yellow)
+                    .Header("[yellow bold]⚠️ WARNING[/]")
+                    .HeaderAlignment(Justify.Center)
+                    .Padding(1, 0);
+                AnsiConsole.Write(Align.Center(resultPanel));
+            }
         }
 
         static void LoadMaze()
         {
-            AnsiConsole.Clear();
-            ShowSectionHeader("Load Maze from File", "📂");
+            SmoothClear();
+            ShowAppTitle();
+            AnsiConsole.WriteLine();
+
+            var headerPanel = new Panel(Align.Center(new Markup("[cyan1 bold]📂 LOAD MAZE FROM FILE[/]")))
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Cyan1)
+                .Padding(1, 0);
+            AnsiConsole.Write(Align.Center(headerPanel));
+            AnsiConsole.WriteLine();
 
             var filename = AnsiConsole.Prompt(
-                new TextPrompt<string>("Enter [cyan]filename[/]:")
+                new TextPrompt<string>("[cyan1]Enter filename[/]:")
                     .DefaultValue("maze.txt")
             );
 
@@ -209,286 +317,565 @@ namespace MazeTUI
                 return;
             }
 
-            var result = RunCommand($"load {filename}");
-            ShowSuccessPanel(result);
+            string result = "";
+            AnsiConsole.Status()
+                .Spinner(Spinner.Known.Dots12)
+                .SpinnerStyle(Style.Parse("cyan1 bold"))
+                .Start($"[cyan1]📥 Loading maze from '{filename}'...[/]", ctx =>
+                {
+                    var stopwatch = Stopwatch.StartNew();
+                    result = RunCommand($"load {filename}");
+                    EnsureMinimumDuration(stopwatch);
+                });
+
+            AnsiConsole.WriteLine();
+            
+            // Verify maze loaded correctly
+            var statusResult = RunCommand("current");
+            bool loadedSuccessfully = !statusResult.Contains("No maze loaded") && 
+                                     !statusResult.Contains("Error");
+            
+            if (loadedSuccessfully)
+            {
+                var resultPanel = new Panel(Align.Center(new Markup($"[green]{result}[/]")))
+                    .Border(BoxBorder.Rounded)
+                    .BorderColor(Color.Green)
+                    .Header("[green bold]✓ SUCCESS[/]")
+                    .HeaderAlignment(Justify.Center)
+                    .Padding(1, 0);
+                AnsiConsole.Write(Align.Center(resultPanel));
+            }
+            else
+            {
+                ShowError($"Failed to load maze from '{filename}'!\nFile may be corrupted or invalid format.");
+            }
         }
 
         static void SaveMaze()
         {
-            AnsiConsole.Clear();
-            ShowSectionHeader("Save Current Maze", "💾");
+            SmoothClear();
+            ShowAppTitle();
+            AnsiConsole.WriteLine();
+
+            var headerPanel = new Panel(Align.Center(new Markup("[cyan1 bold]💾 SAVE CURRENT MAZE[/]")))
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Cyan1)
+                .Padding(1, 0);
+            AnsiConsole.Write(Align.Center(headerPanel));
+            AnsiConsole.WriteLine();
+
+            // Check if maze is loaded
+            var statusResult = RunCommand("current");
+            if (statusResult.Contains("No maze loaded"))
+            {
+                ShowError("No maze loaded! Generate or load a maze first.");
+                return;
+            }
 
             var useCustomName = AnsiConsole.Confirm(
-                "Save with [cyan]custom filename[/]?", 
+                "[cyan1]Save with custom filename?[/]", 
                 false
             );
             
             string command;
+            string filename;
             if (useCustomName)
             {
-                var filename = AnsiConsole.Prompt(
-                    new TextPrompt<string>("Enter [cyan]filename[/]:")
+                filename = AnsiConsole.Prompt(
+                    new TextPrompt<string>("[cyan1]Enter filename[/]:")
                         .DefaultValue("my_maze.txt")
                 );
                 command = $"save {filename}";
             }
             else
             {
+                filename = "maze.txt";
                 command = "save";
             }
 
-            var result = RunCommand(command);
-            ShowSuccessPanel(result);
+            string result = "";
+            AnsiConsole.Status()
+                .Spinner(Spinner.Known.Dots12)
+                .SpinnerStyle(Style.Parse("cyan1 bold"))
+                .Start($"[cyan1]💾 Saving maze to '{filename}'...[/]", ctx =>
+                {
+                    var stopwatch = Stopwatch.StartNew();
+                    result = RunCommand(command);
+                    EnsureMinimumDuration(stopwatch);
+                });
+
+            AnsiConsole.WriteLine();
+            var resultPanel = new Panel(Align.Center(new Markup($"[green]{result}[/]")))
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Green)
+                .Header("[green bold]✓ SUCCESS[/]")
+                .HeaderAlignment(Justify.Center)
+                .Padding(1, 0);
+            AnsiConsole.Write(Align.Center(resultPanel));
         }
 
         static void FindPath()
         {
-            AnsiConsole.Clear();
-            ShowSectionHeader("Find Path using A* Algorithm", "🔍");
+            SmoothClear();
+            ShowAppTitle();
+            AnsiConsole.WriteLine();
 
-            if (!File.Exists(TempFile))
+            var headerPanel = new Panel(Align.Center(new Markup("[cyan1 bold]🔍 FIND PATH (A*)[/]")))
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Cyan1)
+                .Padding(1, 0);
+            AnsiConsole.Write(Align.Center(headerPanel));
+            AnsiConsole.WriteLine();
+
+            // Check current maze state
+            var statusResult = RunCommand("current");
+            if (statusResult.Contains("No maze loaded") || 
+                (statusResult.Contains("5x5") && !statusResult.Contains("loaded")))
             {
-                ShowError("No maze loaded! Generate or load a maze first.");
+                ShowError("No valid maze loaded! Generate or load a maze first.");
                 return;
             }
 
             string result = "";
             AnsiConsole.Status()
-                .Spinner(Spinner.Known.BouncingBar)
+                .Spinner(Spinner.Known.Arc)
                 .SpinnerStyle(Style.Parse("green bold"))
-                .Start("[green]Computing optimal path...[/]", ctx =>
+                .Start("[green]🧠 Computing optimal path...[/]", ctx =>
                 {
+                    var stopwatch = Stopwatch.StartNew();
                     result = RunCommand("find");
+                    EnsureMinimumDuration(stopwatch);
                 });
 
             AnsiConsole.WriteLine();
-            ShowSuccessPanel(result);
+            
+            if (result.Contains("ERROR: No path found") || result.Contains("No path found!"))
+            {
+                var resultPanel = new Panel(Align.Center(new Markup($"[red]{result}[/]")))
+                    .Border(BoxBorder.Rounded)
+                    .BorderColor(Color.Red)
+                    .Header("[red bold]✗ NO PATH[/]")
+                    .HeaderAlignment(Justify.Center)
+                    .Padding(1, 0);
+                AnsiConsole.Write(Align.Center(resultPanel));
+            }
+            else
+            {
+                var resultPanel = new Panel(Align.Center(new Markup($"[green]{result}[/]")))
+                    .Border(BoxBorder.Rounded)
+                    .BorderColor(Color.Green)
+                    .Header("[green bold]✓ PATH FOUND[/]")
+                    .HeaderAlignment(Justify.Center)
+                    .Padding(1, 0);
+                AnsiConsole.Write(Align.Center(resultPanel));
+            }
         }
 
         static void PrintMaze()
         {
-            AnsiConsole.Clear();
-            ShowSectionHeader("Current Maze", "🖨️");
+            SmoothClear();
+            ShowAppTitle();
+            AnsiConsole.WriteLine();
 
-            if (!File.Exists(TempFile))
+            var headerPanel = new Panel(Align.Center(new Markup("[cyan1 bold]🖨️ CURRENT MAZE[/]")))
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Cyan1)
+                .Padding(1, 0);
+            AnsiConsole.Write(Align.Center(headerPanel));
+            AnsiConsole.WriteLine();
+
+            // Check current maze state
+            var statusResult = RunCommand("current");
+            if (statusResult.Contains("No maze loaded") || 
+                (statusResult.Contains("5x5") && !statusResult.Contains("loaded")))
             {
                 ShowError("No maze loaded! Generate or load a maze first.");
                 return;
             }
 
             var result = RunCommand("print");
-            
-            var panel = new Panel(result)
+            var mazePanel = new Panel(Align.Center(new Markup(result)))
                 .Border(BoxBorder.Double)
                 .BorderColor(Color.Cyan1)
-                .Header("[cyan bold] MAZE VISUALIZATION [/]");
-            
-            AnsiConsole.Write(panel);
+                .Padding(1, 0);
+            AnsiConsole.Write(Align.Center(mazePanel));
         }
 
         static void ShowStatus()
         {
-            AnsiConsole.Clear();
-            ShowSectionHeader("Maze Statistics", "📊");
+            SmoothClear();
+            ShowAppTitle();
+            AnsiConsole.WriteLine();
+
+            var headerPanel = new Panel(Align.Center(new Markup("[cyan1 bold]📊 MAZE STATISTICS[/]")))
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Cyan1)
+                .Padding(1, 0);
+            AnsiConsole.Write(Align.Center(headerPanel));
+            AnsiConsole.WriteLine();
 
             var result = RunCommand("current");
-            ShowSuccessPanel(result);
+            var statusPanel = new Panel(Align.Center(new Markup(result)))
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Grey)
+                .Padding(1, 0);
+            AnsiConsole.Write(Align.Center(statusPanel));
         }
 
         static void RaceMode()
         {
-            if (!File.Exists(TempFile))
+            // Check if maze is properly loaded
+            var statusResult = RunCommand("current");
+            if (statusResult.Contains("No maze loaded") || 
+                (statusResult.Contains("5x5") && !statusResult.Contains("loaded")))
             {
-                ShowError("No maze loaded! Generate or load a maze first.");
-                System.Threading.Thread.Sleep(2000);
+                ShowError("No valid maze loaded! Generate or load a maze first.");
+                Thread.Sleep(2000);
                 return;
             }
 
+            // Verify maze has a path
+            var pathResult = RunCommand("find");
+            if (pathResult.Contains("ERROR: No path found") || pathResult.Contains("No path found!"))
+            {
+                ShowError("Current maze has no valid path! Cannot start race mode.");
+                Thread.Sleep(2000);
+                return;
+            }
+
+            bool showControl = true;
+            string lastMazeState = "";
+            bool needsRedraw = true;
+
             while (true)
             {
-                AnsiConsole.Clear();
-                
-                var title = new FigletText("RACE MODE")
-                    .Centered()
-                    .Color(Color.Yellow);
-                AnsiConsole.Write(title);
-                
-                AnsiConsole.WriteLine();
-
                 var hasRace = File.Exists(RaceActiveFile);
-
-                // Show current maze state if race is active
-                if (hasRace)
+                
+                if (
+                    CheckConsoleResize())
                 {
-                    var stateResult = RunCommand("race_state");
-                    AnsiConsole.Write(stateResult);
-                    AnsiConsole.WriteLine();
+                    needsRedraw = true;
                 }
 
-                var statusBadge = hasRace 
-                    ? "[green bold on black] ACTIVE [/]" 
-                    : "[grey bold on black] INACTIVE [/]";
+                if (needsRedraw)
+                {
+                    ShowRaceMenu(showControl, hasRace, ref lastMazeState);
+                    needsRedraw = false;
+                }
 
-                var choices = new[] {
-                    "🚀 Start New Race",
-                    "⬆️  Move Up",
-                    "⬇️  Move Down",
-                    "⬅️  Move Left",
-                    "➡️  Move Right",
-                    "🔄 Reset Race",
-                    "🏆 View Results",
-                    "⬅️  Back to Main Menu"
-                };
+                if (!Console.KeyAvailable)
+                {
+                    Thread.Sleep(100); 
+                    continue;
+                }
 
-                var choice = AnsiConsole.Prompt(
-                    new SelectionPrompt<string>()
-                        .Title($"Race Status: {statusBadge}\n\n[yellow]Choose your move:[/]")
-                        .PageSize(10)
-                        .HighlightStyle(new Style(Color.Yellow, decoration: Decoration.Bold))
-                        .AddChoices(choices)
-                );
+                var key = Console.ReadKey(true);
 
-                if (choice == "⬅️  Back to Main Menu")
+                if (key.Key == ConsoleKey.Tab)
+                {
+                    showControl = !showControl;
+                    needsRedraw = true;
+                    continue;
+                }
+
+                if (key.Key == ConsoleKey.Escape)
+                {
                     break;
+                }
 
                 try
                 {
+                    string choice = GetChoiceFromKey(key, showControl);
+                    
+                    if (string.IsNullOrEmpty(choice))
+                        continue;
+
+                    // Handle movement without active race
+                    if (!showControl && !hasRace)
+                    {
+                        SmoothTransition(() =>
+                        {
+                            SmoothClear();
+                            AnsiConsole.WriteLine();
+                            ShowError("No active race! Start a race first.");
+                        });
+                        PressAnyKey();
+                        showControl = true;
+                        needsRedraw = true;
+                        continue;
+                    }
+
                     string result = "";
                     bool needsPause = true;
+                    bool raceFinished = false;
 
                     switch (choice)
                     {
-                        case "🚀 Start New Race":
+                        case "START":
                             result = RunCommand("race_start");
-                            AnsiConsole.WriteLine();
-                            ShowInfoPanel(result);
+                            needsPause = true;
+                            lastMazeState = "";
+                            needsRedraw = true;
                             break;
-                        case "⬆️  Move Up":
-                            result = RunCommand("race_up");
-                            needsPause = false;
-                            break;
-                        case "⬇️  Move Down":
-                            result = RunCommand("race_down");
-                            needsPause = false;
-                            break;
-                        case "⬅️  Move Left":
-                            result = RunCommand("race_left");
-                            needsPause = false;
-                            break;
-                        case "➡️  Move Right":
-                            result = RunCommand("race_right");
-                            needsPause = false;
-                            break;
-                        case "🔄 Reset Race":
+                        case "RESET":
                             result = RunCommand("race_reset");
-                            AnsiConsole.WriteLine();
-                            ShowInfoPanel(result);
+                            needsPause = true;
+                            lastMazeState = "";
+                            needsRedraw = true;
                             break;
-                        case "🏆 View Results":
+                        case "RESULTS":
                             ViewRaceResults();
-                            continue;
+                            needsPause = false;
+                            needsRedraw = true;
+                            break;
+                        case "UP":
+                        case "DOWN":
+                        case "LEFT":
+                        case "RIGHT":
+                            result = RunCommand($"race_{choice.ToLower()}");
+                            needsPause = false;
+                            needsRedraw = true;
+                            break;
                     }
 
-                    // Check if race was finished by the move
-                    if (!File.Exists(RaceActiveFile) && hasRace && 
-                        (choice.Contains("Move") || choice == "🚀 Start New Race"))
+                    // Check if race finished after movement
+                    if (!File.Exists(RaceActiveFile) && hasRace && !showControl)
                     {
-                        // Race finished! Show results
-                        AnsiConsole.WriteLine();
+                        raceFinished = true;
+                    }
+
+                    // Show result message for control actions
+                    if (needsPause && showControl && !string.IsNullOrEmpty(result))
+                    {
+                        SmoothTransition(() =>
+                        {
+                            SmoothClear();
+                            AnsiConsole.WriteLine();
+                            var resultPanel = new Panel(Align.Center(new Markup($"[cyan1]{result}[/]")))
+                                .Border(BoxBorder.Rounded)
+                                .BorderColor(Color.Cyan1)
+                                .Header("[cyan1 bold]INFO[/]")
+                                .HeaderAlignment(Justify.Center)
+                                .Padding(1, 0);
+                            AnsiConsole.Write(Align.Center(resultPanel));
+                        });
                         PressAnyKey();
+                        needsRedraw = true;
+                    }
+
+                    // Show results if race finished
+                    if (raceFinished)
+                    {
                         ViewRaceResults();
-                        needsPause = false;
-                    }
-
-                    if (needsPause)
-                    {
-                        PressAnyKey();
+                        showControl = true;
+                        lastMazeState = "";
+                        needsRedraw = true;
                     }
                 }
                 catch (Exception ex)
                 {
-                    ShowError(ex.Message);
+                    SmoothTransition(() =>
+                    {
+                        SmoothClear();
+                        AnsiConsole.WriteLine();
+                        ShowError(ex.Message);
+                    });
                     PressAnyKey();
+                    needsRedraw = true;
                 }
+            }
+        }
+
+        static void ShowRaceMenu(bool showControl, bool hasRace, ref string lastMazeState)
+        {
+            string currentMazeState = "";
+            
+            // Get current maze state if race is active
+            if (hasRace)
+            {
+                currentMazeState = RunCommand("race_state");
+            }
+
+            // Redraw screen
+            SmoothClear();
+            AnsiConsole.WriteLine();
+
+            var titlePanel = new Panel(Align.Center(new Markup("[yellow bold]🏁 RACE MODE[/]")))
+                .Border(BoxBorder.Heavy)
+                .BorderColor(Color.Yellow)
+                .Padding(1, 0);
+            AnsiConsole.Write(Align.Center(titlePanel));
+            AnsiConsole.WriteLine();
+
+            // Show maze state if race is active
+            if (hasRace && !string.IsNullOrWhiteSpace(currentMazeState))
+            {
+                var mazePanel = new Panel(Align.Center(new Markup(currentMazeState)))
+                    .Border(BoxBorder.Rounded)
+                    .BorderColor(Color.Cyan1)
+                    .Padding(1, 0);
+                AnsiConsole.Write(Align.Center(mazePanel));
+                AnsiConsole.WriteLine();
+            }
+
+            var statusBadge = hasRace ? "[green bold]ACTIVE[/]" : "[grey bold]INACTIVE[/]";
+            var statusPanel = new Panel(Align.Center(new Markup($"Race Status: {statusBadge}")))
+                .Border(BoxBorder.Rounded)
+                .BorderColor(hasRace ? Color.Green : Color.Grey)
+                .Padding(1, 0);
+            AnsiConsole.Write(Align.Center(statusPanel));
+            AnsiConsole.WriteLine();
+
+            // Show current menu - horizontal layout
+            if (showControl)
+            {
+                var controlPanel = new Panel(
+                    Align.Center(
+                        new Markup(
+                            "[yellow bold]🎮 RACE CONTROL[/]\n\n" +
+                            "[dim]1[/] 🚀 Start New Race    [dim]2[/] 🔄 Reset Race    [dim]3[/] 🏆 View Results"
+                        )
+                    )
+                )
+                    .Border(BoxBorder.Rounded)
+                    .BorderColor(Color.Yellow)
+                    .Padding(2, 1);
+                AnsiConsole.Write(Align.Center(controlPanel));
+            }
+            else
+            {
+                var movementPanel = new Panel(
+                    Align.Center(
+                        new Markup(
+                            "[cyan1 bold]🕹️ MOVEMENT[/]\n\n" +
+                            "[dim]↑[/] ⬆️ Move Up    [dim]↓[/] ⬇️ Move Down    [dim]←[/] ⬅️ Move Left    [dim]→[/] ➡️ Move Right"
+                        )
+                    )
+                )
+                    .Border(BoxBorder.Rounded)
+                    .BorderColor(Color.Cyan1)
+                    .Padding(2, 1);
+                AnsiConsole.Write(Align.Center(movementPanel));
+            }
+
+            AnsiConsole.WriteLine();
+            var hintPanel = new Panel(
+                Align.Center(new Markup("[dim]Press [cyan1 bold]TAB[/] to switch menus | [red bold]ESC[/] to exit[/]"))
+            )
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Grey)
+                .Padding(1, 0);
+            AnsiConsole.Write(Align.Center(hintPanel));
+
+            lastMazeState = currentMazeState;
+        }
+
+        private static string GetChoiceFromKey(ConsoleKeyInfo key, bool isControlMenu)
+        {
+            if (isControlMenu)
+            {
+                return key.KeyChar switch
+                {
+                    '1' => "START",
+                    '2' => "RESET",
+                    '3' => "RESULTS",
+                    _ => ""
+                };
+            }
+            else
+            {
+                return key.Key switch
+                {
+                    ConsoleKey.UpArrow => "UP",
+                    ConsoleKey.DownArrow => "DOWN",
+                    ConsoleKey.LeftArrow => "LEFT",
+                    ConsoleKey.RightArrow => "RIGHT",
+                    _ => ""
+                };
             }
         }
 
         static void ViewRaceResults()
         {
-            AnsiConsole.Clear();
-            ShowSectionHeader("Race Results", "🏆");
+            SmoothTransition(() =>
+            {
+                SmoothClear();
+                AnsiConsole.WriteLine();
 
-            if (!File.Exists(RaceResultsFile))
-            {
-                var noResults = new Panel("[yellow]No race results found yet.\nComplete a race to see your statistics here![/]")
-                    .Border(BoxBorder.Rounded)
-                    .BorderColor(Color.Yellow)
-                    .Header("[yellow] INFO [/]");
-                
-                AnsiConsole.Write(noResults);
-            }
-            else
-            {
-                var results = File.ReadAllText(RaceResultsFile);
-                var panel = new Panel(results)
-                    .Border(BoxBorder.Double)
+                var headerPanel = new Panel(Align.Center(new Markup("[gold1 bold]🏆 RACE RESULTS[/]")))
+                    .Border(BoxBorder.Heavy)
                     .BorderColor(Color.Gold1)
-                    .Header("[gold1 bold] 🏆 LATEST RACE RESULTS 🏆 [/]");
-                
-                AnsiConsole.Write(panel);
-            }
+                    .Padding(1, 0);
+                AnsiConsole.Write(Align.Center(headerPanel));
+                AnsiConsole.WriteLine();
+
+                if (!File.Exists(RaceResultsFile))
+                {
+                    var noResultsPanel = new Panel(
+                        Align.Center(
+                            new Markup("[yellow]No race results found yet.[/]\n[dim]Complete a race to see your statistics![/]")
+                        )
+                    )
+                        .Border(BoxBorder.Rounded)
+                        .BorderColor(Color.Yellow)
+                        .Padding(2, 1);
+                    AnsiConsole.Write(Align.Center(noResultsPanel));
+                }
+                else
+                {
+                    var results = File.ReadAllText(RaceResultsFile);
+                    var resultsPanel = new Panel(Align.Center(new Markup(results)))
+                        .Border(BoxBorder.Double)
+                        .BorderColor(Color.Gold1)
+                        .Padding(1, 0);
+                    AnsiConsole.Write(Align.Center(resultsPanel));
+                }
+            });
 
             PressAnyKey();
         }
 
-        // Вспомогательные методы для красивого вывода
-
-        static void ShowSectionHeader(string title, string icon)
-        {
-            var rule = new Rule($"[cyan bold]{icon} {title.ToUpper()}[/]")
-            {
-                Justification = Justify.Left,
-                Style = Style.Parse("cyan")
-            };
-            AnsiConsole.Write(rule);
-            AnsiConsole.WriteLine();
-        }
-
-        static void ShowSuccessPanel(string content)
-        {
-            var panel = new Panel(content)
-                .Border(BoxBorder.Rounded)
-                .BorderColor(Color.Green)
-                .Header("[green] SUCCESS [/]");
-            
-            AnsiConsole.Write(panel);
-        }
-
-        static void ShowInfoPanel(string content)
-        {
-            var panel = new Panel(content)
-                .Border(BoxBorder.Rounded)
-                .BorderColor(Color.Cyan1)
-                .Header("[cyan1] INFO [/]");
-            
-            AnsiConsole.Write(panel);
-        }
-
         static void ShowError(string message)
         {
-            var panel = new Panel($"[red]{message}[/]")
+            var errorPanel = new Panel(Align.Center(new Markup($"[red bold]⚠️ {message}[/]")))
                 .Border(BoxBorder.Heavy)
                 .BorderColor(Color.Red)
-                .Header("[red bold] ⚠ ERROR [/]");
-            
-            AnsiConsole.Write(panel);
+                .Header("[red bold]ERROR[/]")
+                .HeaderAlignment(Justify.Center)
+                .Padding(1, 0);
+            AnsiConsole.Write(Align.Center(errorPanel));
         }
 
         static void PressAnyKey()
         {
             AnsiConsole.WriteLine();
-            AnsiConsole.Markup("[grey]Press [cyan]any key[/] to continue...[/]");
+            AnsiConsole.Write(Align.Center(new Markup("[dim]Press [cyan1 bold]any key[/] to continue...[/]")));
             Console.ReadKey(true);
+        }
+
+        static void EnsureMinimumDuration(Stopwatch stopwatch)
+        {
+            var elapsed = stopwatch.ElapsedMilliseconds;
+            if (elapsed < SpinnerMinDuration)
+            {
+                Thread.Sleep((int)(SpinnerMinDuration - elapsed));
+            }
+        }
+
+        static void SmoothClear()
+        {
+            AnsiConsole.Clear();
+        }
+
+        static void SmoothTransition(Action renderAction)
+        {
+            Thread.Sleep(30);
+            
+            // Render new content
+            renderAction();
+            
+            // Small delay for smooth perception
+            Thread.Sleep(30);
         }
 
         static string RunCommand(string arguments)
@@ -522,8 +909,8 @@ namespace MazeTUI
             }
             catch (Exception ex)
             {
-                return $"[red]Error executing command: {ex.Message}[/]";
+                return $"[red]Error: {ex.Message}[/]";
             }
         }
     }
-}   
+}
